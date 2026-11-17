@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist>
+  <schema id="org.gnome.shell.extensions.server-vitals" path="/org/gnome/shell/extensions/server-vitals/">
+    <key name="servers" type="s">
+      <default>'[]'</default>
+      <summary>Configured servers</summary>
+      <description>JSON array of objects: {"id", "name", "host", "user", "port"}. user and port are optional ("" and 0 mean: use ~/.ssh/config or the ssh defaults).</description>
+    </key>
+    <key name="pinned" type="s">
+      <default>''</default>
+      <summary>Id of the server shown in the top bar</summary>
+    </key>
+    <key name="refresh-interval" type="i">
+      <range min="1" max="300"/>
+      <default>5</default>
+      <summary>Seconds between samples</summary>
+    </key>
+    <key name="show-name" type="b">
+      <default>true</default>
+      <summary>Show the server name in the top bar</summary>
+    </key>
+    <key name="show-ram-percent" type="b">
+      <default>true</default>
+      <summary>Show RAM used as a percentage in the top bar</summary>
+    </key>
+    <key name="show-ram-used" type="b">
+      <default>false</default>
+      <summary>Show RAM used as an amount in the top bar</summary>
+    </key>
+    <key name="show-cpu" type="b">
+      <default>true</default>
+      <summary>Show CPU usage in the top bar</summary>
+    </key>
+    <key name="show-net-speed" type="b">
+      <default>true</default>
+      <summary>Show network upload and download speed in the top bar</summary>
+    </key>
+    <key name="show-net-total" type="b">
+      <default>true</default>
+      <summary>Show total uploaded and downloaded since boot in the top bar</summary>
+    </key>
+  </schema>
+</schemalist>

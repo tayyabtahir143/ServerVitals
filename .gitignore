@@ -1,0 +1,5 @@
+*.shell-extension.zip
+**/gschemas.compiled
+.t/
+.env
+*.log
