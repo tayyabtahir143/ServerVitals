@@ -1,16 +1,12 @@
-/* Server Vitals - small symbolic icon followed by a value, repeated. */
 .server-vitals-box { spacing: 10px; padding: 0 3px; }
 .server-vitals-item { spacing: 0; }
 .server-vitals-icon { -st-icon-style: symbolic; margin: 0 5px 0 0; padding: 0; }
 .server-vitals-label { font-feature-settings: "tnum"; }
 .server-vitals-dim { opacity: 0.6; }
 
-.server-vitals-row { spacing: 4px; padding: 2px 0; }
-.server-vitals-row-header { spacing: 8px; }
-.server-vitals-row-name { font-weight: bold; }
-.server-vitals-row-line { spacing: 14px; }
-.server-vitals-row-extra { font-size: 0.9em; opacity: 0.7; }
 .server-vitals-status-online { color: #57e389; }
 .server-vitals-status-offline { color: #ff7b63; }
 .server-vitals-status-connecting { opacity: 0.6; }
-.server-vitals-row-error { color: #ff7b63; }
+.server-vitals-button-action { -st-icon-style: symbolic; border-radius: 32px; margin: 0; min-height: 22px; min-width: 22px; padding: 10px; }
+.server-vitals-button-action > StIcon { icon-size: 16px; }
+.server-vitals-button-box { padding: 0; spacing: 22px; }

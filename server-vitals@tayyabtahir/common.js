@@ -1,17 +1,10 @@
-// Shared helpers: server-list parsing, input validation and number formatting.
-// Only plain JS in here, so it can be imported by the shell extension,
-// by the preferences window and by the standalone tests.
+export {MonitorHistory, SustainedAlert} from './monitor.js';
 
 export const SCHEMA_ID = 'org.gnome.shell.extensions.server-vitals';
 
 const HOST_RE = /^[A-Za-z0-9_.:%-]+$/;
 const USER_RE = /^[A-Za-z0-9_.@\\+-]+$/;
 
-/**
- * Return an error message for a host value, or null when it is acceptable.
- * Values starting with '-' are refused so they can never be read by ssh as
- * an option.
- */
 export function validateHost(host) {
     if (typeof host !== 'string' || host.length === 0)
         return 'Host is required';
@@ -36,18 +29,12 @@ export function validateUser(user) {
     return null;
 }
 
-/** port: 0 means "not set" (ssh default or ~/.ssh/config). */
 export function validatePort(port) {
     if (!Number.isInteger(port) || port < 0 || port > 65535)
         return 'Port must be a number between 1 and 65535';
     return null;
 }
 
-/**
- * Split "user@host", "host:port", "user@host:port" or "[v6addr]:port".
- * Returns {user, host, port} where user is '' and port is 0 when absent.
- * No validation is done here.
- */
 export function parseAddress(text) {
     let rest = String(text ?? '').trim();
     let user = '';
@@ -65,7 +52,7 @@ export function parseAddress(text) {
         if (m[2])
             port = parseInt(m[2], 10);
     } else {
-        // Exactly one colon: host:port. More than one: a bare IPv6 address.
+
         m = rest.match(/^([^:]*):(\d+)$/);
         if (m) {
             rest = m[1];
@@ -75,10 +62,79 @@ export function parseAddress(text) {
     return {user, host: rest, port};
 }
 
-/**
- * Clean one server object coming from settings or from the prefs dialog.
- * Returns {server, error}: server is null when the entry is not usable.
- */
+const GIT_HOSTS = /(^|\.)(github\.com|gitlab\.com|bitbucket\.org|codeberg\.org|ssh\.dev\.azure\.com)$/i;
+
+export function isGitHost(host) {
+    return GIT_HOSTS.test(host.hostName || host.alias);
+}
+
+export function parseSshConfig(text) {
+    const hosts = [];
+    const includes = [];
+    let current = [];
+    for (const raw of String(text).split('\n')) {
+        const line = raw.trim();
+        if (!line || line.startsWith('#'))
+            continue;
+        const match = line.match(/^(\S+?)(?:\s*=\s*|\s+)(.*)$/);
+        if (!match)
+            continue;
+        const key = match[1].toLowerCase();
+        const values = match[2].trim().split(/\s+/).map(value => value.replace(/^"(.*)"$/, '$1'));
+        if (key === 'host') {
+            current = values
+                .filter(value => !/[*?!]/.test(value) && validateHost(value) === null)
+                .map(alias => ({alias, hostName: '', user: ''}));
+            hosts.push(...current);
+        } else if (key === 'match') {
+            current = [];
+        } else if (key === 'include') {
+            includes.push(...values);
+        } else if (key === 'hostname' || key === 'user') {
+            const field = key === 'user' ? 'user' : 'hostName';
+            for (const host of current)
+                host[field] ||= values[0];
+        }
+    }
+    return {hosts, includes};
+}
+
+export function parseKnownHosts(text) {
+    const hosts = [];
+    const seen = new Set();
+    let hashed = 0;
+    for (const raw of String(text).split('\n')) {
+        const fields = raw.trim().split(/\s+/);
+        if (!fields[0] || fields[0].startsWith('#') || fields[0].startsWith('@'))
+            continue;
+        if (fields[0].startsWith('|')) {
+            hashed++;
+            continue;
+        }
+        const entries = [];
+        for (const name of fields[0].split(',')) {
+            const match = name.match(/^\[([^\]]+)\]:(\d+)$/);
+            const host = match ? match[1] : name;
+            const port = match ? Number(match[2]) : 0;
+            if (!/[*?!]/.test(host) && validateHost(host) === null && validatePort(port) === null)
+                entries.push({host, port});
+        }
+        const entry = entries.find(item => !/^[\d.]+$/.test(item.host) && !item.host.includes(':')) ?? entries[0];
+        const key = entry && `${entry.host} ${entry.port}`;
+        if (!entry || seen.has(key))
+            continue;
+        seen.add(key);
+        hosts.push(entry);
+    }
+    return {hosts, hashed};
+}
+
+export function validMount(path) {
+    return typeof path === 'string' && path.length <= 256 && /^\/[A-Za-z0-9_./ -]*$/u.test(path) && !/[\r\n]/.test(path);
+}
+
+const validInterface = name => typeof name === 'string' && /^[^\s/:\x00-\x1f\x7f]{1,15}$/u.test(name);
+
 export function normalizeServer(raw) {
     if (!raw || typeof raw !== 'object')
         return {server: null, error: 'Not an object'};
@@ -103,10 +159,22 @@ export function normalizeServer(raw) {
     if (!id)
         return {server: null, error: 'Missing id'};
 
-    return {server: {id, name, host, user, port}, error: null};
+    const server = {id, name, host, user, port};
+    if (validMount(raw.mount))
+        server.mount = raw.mount;
+    if (raw.maintenance === true)
+        server.maintenance = true;
+    if (Array.isArray(raw.favorites))
+        server.favorites = [...new Set(raw.favorites.filter(validInterface))].slice(0, 256);
+    if (raw.labels && typeof raw.labels === 'object')
+        server.labels = Object.fromEntries(Object.entries(raw.labels).filter(([n, v]) =>
+            validInterface(n) && typeof v === 'string').slice(0, 256).map(([n,v]) =>
+            [n, v.replace(/[\x00-\x1f\x7f]/g, '').slice(0, 40)]));
+    if (validInterface(raw.networkInterface))
+        server.networkInterface = raw.networkInterface;
+    return {server, error: null};
 }
 
-/** Parse the "servers" settings string. Bad entries are dropped. */
 export function parseServers(json) {
     let list;
     try {
@@ -129,12 +197,10 @@ export function parseServers(json) {
     return servers;
 }
 
-/** What to call a server in the UI. */
 export function serverTitle(server) {
     return server.name || server.host;
 }
 
-/** user@host:port, leaving out the parts that are not set. */
 export function serverAddress(server) {
     let host = server.host;
     if (server.port && host.includes(':'))
@@ -142,7 +208,6 @@ export function serverAddress(server) {
     return `${server.user ? `${server.user}@` : ''}${host}${server.port ? `:${server.port}` : ''}`;
 }
 
-/** True when two entries would open the same ssh connection. */
 export function sameTarget(a, b) {
     return a.host === b.host && a.user === b.user && a.port === b.port;
 }
@@ -157,7 +222,6 @@ function threeDigits(value) {
 
 const UNITS = ['B', 'KB', 'MB', 'GB', 'TB', 'PB'];
 
-/** 1536 -> "1.50 KB" (1024-based, three significant digits, like Vitals). */
 export function formatBytes(bytes) {
     if (bytes === null || bytes === undefined || !Number.isFinite(bytes))
         return '\u2026';
@@ -175,7 +239,7 @@ export function formatBytes(bytes) {
 export function formatRate(bytesPerSecond) {
     if (bytesPerSecond === null || bytesPerSecond === undefined || !Number.isFinite(bytesPerSecond))
         return '\u2026';
-    // Rates below 1 KB/s are shown in KB/s so the label does not jump around.
+
     if (bytesPerSecond < 1000)
         return `${(Math.max(0, bytesPerSecond) / 1024).toFixed(2)} KB/s`;
     return `${formatBytes(bytesPerSecond)}/s`;

@@ -1,10 +1,3 @@
-// Standalone test for the collector the extension uses.
-//
-//   gjs -m tests/collector-test.js [seconds] target [target...]
-//
-// target is [user@]host[:port]. Every state change is printed as one line.
-// Example: gjs -m tests/collector-test.js 15 127.0.0.1:22222 192.0.2.1 127.0.0.1:1
-
 import GLib from 'gi://GLib';
 
 import {ServerCollector, Status, buildSshArgv} from '../server-vitals@tayyabtahir/collector.js';
@@ -28,7 +21,7 @@ const collectors = [];
 let n = 0;
 for (const target of args) {
     const {server, error} = Common.normalizeServer({
-        id: `t${n++}`, name: '', ...Common.parseAddress(target),
+        id: `t${n++}`, name: '', networkInterface: GLib.getenv('SV_INTERFACE'), ...Common.parseAddress(target),
     });
     if (!server) {
         print(`[${elapsed()}s] ${target}: REJECTED by validation: ${error}`);
@@ -43,6 +36,7 @@ for (const target of args) {
             print(`[${elapsed()}s] ${who} ONLINE  ` +
                 `ram ${Common.formatBytes(s.memUsed)}/${Common.formatBytes(s.memTotal)} (${Common.formatPercent(s.memPercent)})  ` +
                 `cpu ${Common.formatPercent(s.cpuPercent)} of ${s.cpuCount}  ` +
+                `interfaces ${s.interfaceNames.join(',')} selected ${c.server.networkInterface ?? 'none'}  ` +
                 `up ${Common.formatRate(s.txRate)} down ${Common.formatRate(s.rxRate)}  ` +
                 `total up ${Common.formatBytes(s.txTotal)} [${s.txTotal}] down ${Common.formatBytes(s.rxTotal)} [${s.rxTotal}]  ` +
                 `disk ${Common.formatBytes(s.diskUsed)}/${Common.formatBytes(s.diskTotal)} (${Common.formatPercent(s.diskPercent)})  ` +
@@ -59,7 +53,7 @@ GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT, seconds, () => {
     for (const c of collectors)
         c.destroy();
     print(`[${elapsed()}s] destroyed all collectors`);
-    // Let the "ssh -O exit" helpers finish before leaving.
+
     GLib.timeout_add(GLib.PRIORITY_DEFAULT, 500, () => {
         loop.quit();
         return GLib.SOURCE_REMOVE;

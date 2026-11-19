@@ -2,7 +2,7 @@
   "uuid": "server-vitals@tayyabtahir",
   "name": "Server Vitals",
   "description": "Live RAM, CPU and network readings for remote Linux servers in the top bar, collected over SSH. Nothing is installed on the servers.",
-  "shell-version": ["50"],
+  "shell-version": ["46", "47", "48", "49", "50", "51"],
   "settings-schema": "org.gnome.shell.extensions.server-vitals",
   "url": "https://github.com/tayyabtahir143/ServerVitals",
   "version": 1
